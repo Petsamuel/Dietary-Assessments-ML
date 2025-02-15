@@ -1,47 +1,24 @@
 import pandas as pd
-import joblib
 import numpy as np
+import joblib
 
-def prepare_test_data(personal_info, lifestyle_factors, medical_history, dietary_prefs):
+def prepare_input_data(input_data):
     """
-    Convert raw input data into format required by the models
+    Prepare input data for model prediction by calculating required features
     """
     # Calculate BMI
-    height_m = personal_info['height_cm'] / 100  # convert cm to meters
-    weight_kg = personal_info['weight_kg']
+    height_m = input_data['Height'] / 100
+    weight_kg = input_data['Weight']
     bmi = weight_kg / (height_m ** 2)
     
-    # Map activity level to numeric scale (1-5)
-    activity_mapping = {
-        'Sedentary': 1,
-        'Lightly active': 2,
-        'Moderately active': 3,
-        'Very active': 4,
-        'Super active': 5
-    }
+    # Calculate estimated caloric needs (Harris-Benedict equation)
+    if input_data['Gender'] == 'Female':
+        bmr = 447.593 + (9.247 * weight_kg) + (3.098 * input_data['Height']) - (4.330 * input_data['Age'])
+    else:
+        bmr = 88.362 + (13.397 * weight_kg) + (4.799 * input_data['Height']) - (5.677 * input_data['Age'])
     
-    # Calculate approximate body fat percentage using BMI
-    # This is a rough estimation - in real application you'd want actual measurements
-    if personal_info['gender'].lower() == 'male':
-        body_fat = (1.20 * bmi) + (0.23 * personal_info['age']) - 16.2
-    else:  # female
-        body_fat = (1.20 * bmi) + (0.23 * personal_info['age']) - 5.4
-    
-    # Estimate waist circumference based on BMI (rough approximation)
-    # In real application, you'd want actual measurements
-    if personal_info['gender'].lower() == 'male':
-        waist = 75 + (0.74 * bmi)
-    else:  # female
-        waist = 64 + (0.74 * bmi)
-    
-    # Estimate calories based on activity level and body metrics
-    # Basic Harris-Benedict equation
-    if personal_info['gender'].lower() == 'male':
-        bmr = 88.362 + (13.397 * weight_kg) + (4.799 * personal_info['height_cm']) - (5.677 * personal_info['age'])
-    else:  # female
-        bmr = 447.593 + (9.247 * weight_kg) + (3.098 * personal_info['height_cm']) - (4.330 * personal_info['age'])
-    
-    activity_multiplier = {
+    # Activity level multiplier
+    activity_multipliers = {
         'Sedentary': 1.2,
         'Lightly active': 1.375,
         'Moderately active': 1.55,
@@ -49,106 +26,100 @@ def prepare_test_data(personal_info, lifestyle_factors, medical_history, dietary
         'Super active': 1.9
     }
     
-    kcal = bmr * activity_multiplier[lifestyle_factors['activity_level']]
+    kcal = bmr * activity_multipliers[input_data['Activity Level']]
     
     # Estimate macronutrients based on dietary preference
-    if dietary_prefs['diet_type'].lower() == 'keto':
-        prot = (kcal * 0.20) / 4  # 20% of calories from protein
-        carb = (kcal * 0.05) / 4  # 5% of calories from carbs
-        fat = (kcal * 0.75) / 9   # 75% of calories from fat
-    elif dietary_prefs['diet_type'].lower() == 'vegan':
-        prot = (kcal * 0.15) / 4  # 15% of calories from protein
-        carb = (kcal * 0.60) / 4  # 60% of calories from carbs
-        fat = (kcal * 0.25) / 9   # 25% of calories from fat
+    if input_data['Dietary Preference'] == 'Keto':
+        prot = (kcal * 0.20) / 4  # 20% protein
+        carb = (kcal * 0.05) / 4  # 5% carbs
+        fat = (kcal * 0.75) / 9   # 75% fat
+    elif input_data['Dietary Preference'] in ['Vegetarian', 'Vegan']:
+        prot = (kcal * 0.15) / 4  # 15% protein
+        carb = (kcal * 0.60) / 4  # 60% carbs
+        fat = (kcal * 0.25) / 9   # 25% fat
     else:  # balanced
-        prot = (kcal * 0.30) / 4  # 30% of calories from protein
-        carb = (kcal * 0.45) / 4  # 45% of calories from carbs
-        fat = (kcal * 0.25) / 9   # 25% of calories from fat
+        prot = (kcal * 0.30) / 4  # 30% protein
+        carb = (kcal * 0.45) / 4  # 45% carbs
+        fat = (kcal * 0.25) / 9   # 25% fat
     
-    # Estimate fiber based on carbs
-    dfib = carb * 0.1  # Assuming 10% of carbs are fiber
+    # Estimate other nutritional values
+    vegsrv = 6 if input_data['Dietary Preference'] in ['Vegetarian', 'Vegan'] else 3
+    grainsrv = 6 if 'Gluten' not in input_data['Intolerances'] else 2
+    fruitsrv = 4  # recommended daily servings
     
-    # Create test data dictionary matching model features
-    test_data = {
-        'Age': personal_info['age'],
-        'BMI': bmi,
-        '% Body fat': body_fat,
-        'Waist': waist,
-        'KCAL': kcal,
-        'PROT': prot,
-        'FAT': fat,
-        'CARB': carb,
-        'DFIB': dfib,
-        'Moderate physical activity': activity_mapping[lifestyle_factors['activity_level']]
-    }
+    # Estimate minerals based on caloric intake
+    calc = kcal * 0.4  # mg per calorie
+    phos = kcal * 0.3  # mg per calorie
+    fe = kcal * 0.006  # mg per calorie
     
-    return pd.DataFrame([test_data])
+    # Create DataFrame with required features
+    prepared_data = pd.DataFrame({
+        'KCAL': [kcal],
+        'PROT': [prot],
+        'FAT': [fat],
+        'CARB': [carb],
+        'CALC': [calc],
+        'PHOS': [phos],
+        'FE': [fe],
+        'VEGSRV': [vegsrv],
+        'GRAINSRV': [grainsrv],
+        'FRUITSRV': [fruitsrv]
+    })
+    
+    return prepared_data
 
-def test_models(personal_info, lifestyle_factors, medical_history, dietary_prefs):
-    """
-    Test all three models with the provided data
-    """
-    # Prepare test data
-    test_df = prepare_test_data(personal_info, lifestyle_factors, medical_history, dietary_prefs)
-    
-    # Load saved models
-    try:
-        obesity_model = joblib.load('best_regression_model.pkl')
-        diet_model = joblib.load('best_regression_model.pkl')
-        nutrition_model = joblib.load('best_regression_model.pkl')
-        
-        # Make predictions
-        obesity_pred = obesity_model.predict(test_df)
-        diet_pred = diet_model.predict(test_df)
-        nutrition_score = nutrition_model.predict(test_df)
-        
-        # Format results
-        results = {
-            'Obesity Risk': 'High' if obesity_pred[0] == 1 else 'Low',
-            'Dietary Classification': diet_pred[0],
-            'Nutritional Score': round(nutrition_score[0], 2)
-        }
-        
-        return results
-        
-    except FileNotFoundError:
-        return "Error: Model files not found. Please ensure the models have been trained and saved."
-
-# Example usage with hardcoded data
+# Example usage
 if __name__ == "__main__":
     # Sample input data
-    personal_info = {
-        'age': 35,
-        'gender': 'Female',
-        'height_cm': 165,  # 5'5" in cm
-        'weight_kg': 65    # 143 lbs in kg
+    input_data = {
+        'Age': 30,
+        'Gender': 'Female',
+        'Height': 160,
+        'Weight': 60,
+        'Activity Level': 'Moderately active',
+        'Sleep Duration': 7,
+        'Stress Level': 'Moderate',
+        'Smoking Status': 'No',
+        'Alcohol Consumption': 'Occasional',
+        'Diabetes': 'No',
+        'Hypertension': 'No',
+        'High Cholesterol': 'No',
+        'Obesity': 'No',
+        'Food Allergies': 'None',
+        'Dietary Preference': 'Vegetarian',
+        'Preferred Protein Sources': 'Plant-Based',
+        'Intolerances': 'None'
     }
     
-    lifestyle_factors = {
-        'activity_level': 'Moderately active',
-        'sleep_duration': 7,
-        'stress_level': 'Moderate',
-        'smoking_status': 'No',
-        'alcohol_consumption': 'Occasional'
-    }
-    
-    medical_history = {
-        'diabetes': 'No',
-        'hypertension': 'No',
-        'high_cholesterol': 'No',
-        'obesity': 'No',
-        'food_allergies': ['None'],
-        'other_conditions': ''
-    }
-    
-    dietary_prefs = {
-        'diet_type': 'Balanced',
-        'protein_sources': ['Meat', 'Fish', 'Dairy'],
-        'intolerances': ['None']
-    }
-    
-    # Test the models
-    results = test_models(personal_info, lifestyle_factors, medical_history, dietary_prefs)
-    print("\nModel Predictions:")
-    for key, value in results.items():
-        print(f"{key}: {value}")
+    try:
+        # Load the model
+        model = joblib.load('best_regression_model.pkl')
+        
+        # Prepare the input data
+        X_input = prepare_input_data(input_data)
+        
+        # Make prediction
+        prediction = model.predict(X_input)
+        
+        print("\nPrediction Results:")
+        print(f"Nutritional Score: {prediction[0]:.2f}")
+        
+        # Provide interpretation
+        if prediction[0] > 75:
+            print("Interpretation: Excellent nutritional balance")
+        elif prediction[0] > 50:
+            print("Interpretation: Good nutritional balance")
+        elif prediction[0] > 25:
+            print("Interpretation: Fair nutritional balance - consider dietary adjustments")
+        else:
+            print("Interpretation: Poor nutritional balance - consider consulting a nutritionist")
+            
+        # Print the calculated features for verification
+        print("\nCalculated Nutritional Values:")
+        for column in X_input.columns:
+            print(f"{column}: {X_input[column].values[0]:.2f}")
+            
+    except FileNotFoundError:
+        print("Error: Model file 'best_regression_model.pkl' not found. Please ensure the model has been trained and saved.")
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
