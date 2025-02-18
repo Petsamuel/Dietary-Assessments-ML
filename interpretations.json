@@ -1,0 +1,65 @@
+{
+  "interpretations": [
+    {
+      "threshold": 85,
+      "category": "Optimal Nutritional Balance",
+      "recommendations": [
+        "Excellent diet! Keep up your current habits.",
+        "Maintain variety in food choices to ensure micronutrient balance.",
+        "Stay hydrated and monitor fiber intake for gut health.",
+        "Consider seasonal and organic food choices for better nutrient quality."
+      ]
+    },
+    {
+      "threshold": 70,
+      "category": "Very Good Nutritional Balance",
+      "recommendations": [
+        "You have a well-balanced diet! Minor improvements can enhance your health.",
+        "Increase antioxidant-rich foods like berries and nuts.",
+        "Ensure you're consuming enough Omega-3 fats for brain and heart health.",
+        "Consider meal timing adjustments for better nutrient absorption."
+      ]
+    },
+    {
+      "threshold": 50,
+      "category": "Good Nutritional Balance",
+      "recommendations": [
+        "Your diet is fairly balanced but has room for improvement.",
+        "Increase protein intake if you have high activity levels.",
+        "Reduce processed food consumption to avoid unnecessary additives.",
+        "Incorporate more whole grains and fiber for digestion and energy stability."
+      ]
+    },
+    {
+      "threshold": 35,
+      "category": "Needs Improvement",
+      "recommendations": [
+        "Your diet is missing key nutrients. Small changes can make a big difference!",
+        "Increase fresh fruit and vegetable intake for better vitamin and mineral levels.",
+        "Consider whole-food sources of protein rather than processed alternatives.",
+        "Reduce added sugars and opt for natural sweeteners like honey or fruits."
+      ]
+    },
+    {
+      "threshold": 20,
+      "category": "At Risk - Poor Nutritional Balance",
+      "recommendations": [
+        "Your diet is lacking essential nutrients and may impact health.",
+        "Reduce reliance on fast food and packaged meals.",
+        "Increase hydration—aim for at least 2L of water per day.",
+        "Consider working with a nutritionist to build a structured meal plan."
+      ]
+    },
+    {
+      "threshold": 0,
+      "category": "Severe Nutritional Deficiency",
+      "recommendations": [
+        "Immediate dietary changes are needed to improve health!",
+        "Increase intake of nutrient-dense foods like leafy greens, legumes, and lean proteins.",
+        "Reduce processed foods, excess sugar, and unhealthy fats.",
+        "Strongly consider seeking medical or professional nutrition guidance.",
+        "Start tracking your daily food intake to monitor improvements."
+      ]
+    }
+  ]
+}

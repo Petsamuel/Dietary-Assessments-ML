@@ -1,6 +1,6 @@
 from enum import Enum
-from typing import List, Optional
-from pydantic import BaseModel, validator, Field
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, field_validator, Field
 from typing import Union
 
 # Enums for validation
@@ -52,24 +52,45 @@ class DietAnalysisInput(BaseModel):
     obesity: str = Field(..., pattern="^(No|Overweight|Underweight|Yes)$")
     food_allergies: List[str] = []
     dietary_preference: DietaryPreference
-    preferred_protein_sources: ProteinSource
+    preferred_protein_sources: List[ProteinSource] = []
     intolerances: List[str] = []
 
-    @validator('food_allergies', 'intolerances')
+    @field_validator('food_allergies', 'intolerances')
     def convert_none_to_empty_list(cls, v):
         if v == ['None'] or v == ['none'] or v == None:
             return []
         return v
 
-# Response model
+# Response models
 class DietAnalysisResponse(BaseModel):
     nutritional_score: float
     interpretation: str
     calculated_values: dict
     recommendations: List[str]
-    
-# Contact model
-class Contact(BaseModel):
-    name: str
-    email: str
-    message: str
+
+class ProcessingStep(BaseModel):
+    step_name: str
+    description: str
+    parameters: Dict[str, Any]
+
+class EnhancedDietAnalysisResponse(DietAnalysisResponse):
+    processing_steps: List[ProcessingStep]
+    total_processing_time: float
+
+class PreparationResponse(BaseModel):
+    data: Union[Dict[str, float], List[Dict[str, float]]]
+    processing_time: float
+    status: str
+    source_type: str
+    records_processed: int
+
+class PredictionResponse(BaseModel):
+    score: float
+    processing_time: float
+    status: str
+
+class InterpretationResponse(BaseModel):
+    interpretation: str
+    recommendations: List[str]
+    processing_time: float
+    status: str

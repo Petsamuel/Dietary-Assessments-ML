@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException
 import pandas as pd
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Tuple
+import json
 import joblib
 from typing import Union
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +10,11 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 from models.model import DietAnalysisInput, DietAnalysisResponse, StressLevel, Gender, ActivityLevel, DietaryPreference, ProteinSource
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -21,72 +26,88 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Load the model at startup
 try:
     model = joblib.load('best_regression_model.pkl')
+    logger.info("Model loaded successfully")
 except FileNotFoundError:
     model = None
+    logger.error("Model file not found")
 
 def prepare_input_data(input_data: DietAnalysisInput) -> pd.DataFrame:
     """Prepare input data for model prediction"""
-    # Calculate BMI
-    height_m = input_data.height / 100
-    weight_kg = input_data.weight
-    bmi = weight_kg / (height_m ** 2)
+    try:
+        # Calculate BMI
+        height_m = input_data.height / 100
+        weight_kg = input_data.weight
+        bmi = weight_kg / (height_m ** 2)
+        
+        # Calculate estimated caloric needs using Harris-Benedict equation
+        if input_data.gender == Gender.FEMALE:
+            bmr = 447.593 + (9.247 * weight_kg) + (3.098 * input_data.height) - (4.330 * input_data.age)
+        else:
+            bmr = 88.362 + (13.397 * weight_kg) + (4.799 * input_data.height) - (5.677 * input_data.age)
+        
+        # Activity level multiplier
+        activity_multipliers = {
+            ActivityLevel.SEDENTARY: 1.2,
+            ActivityLevel.LIGHTLY_ACTIVE: 1.375,
+            ActivityLevel.MODERATELY_ACTIVE: 1.55,
+            ActivityLevel.VERY_ACTIVE: 1.725,
+            ActivityLevel.SUPER_ACTIVE: 1.9
+        }
+        
+        kcal = bmr * activity_multipliers[input_data.activity_level]
+        
+        # Estimate macronutrients based on dietary preference
+        if input_data.dietary_preference == DietaryPreference.KETO:
+            prot = (kcal * 0.20) / 4
+            carb = (kcal * 0.05) / 4
+            fat = (kcal * 0.75) / 9
+        elif input_data.dietary_preference in [DietaryPreference.VEGETARIAN, DietaryPreference.VEGAN]:
+            prot = (kcal * 0.15) / 4
+            carb = (kcal * 0.60) / 4
+            fat = (kcal * 0.25) / 9
+        else:
+            prot = (kcal * 0.30) / 4
+            carb = (kcal * 0.45) / 4
+            fat = (kcal * 0.25) / 9
+        
+        # Estimate servings
+        vegsrv = 6 if input_data.dietary_preference in [DietaryPreference.VEGETARIAN, DietaryPreference.VEGAN] else 3
+        grainsrv = 6 if 'Gluten' not in input_data.intolerances else 2
+        fruitsrv = 4
+        
+        # Estimate minerals
+        calc = kcal * 0.4
+        phos = kcal * 0.3
+        fe = kcal * 0.006
+        
+        return pd.DataFrame({
+            'KCAL': [kcal],
+            'PROT': [prot],
+            'FAT': [fat],
+            'CARB': [carb],
+            'CALC': [calc],
+            'PHOS': [phos],
+            'FE': [fe],
+            'VEGSRV': [vegsrv],
+            'GRAINSRV': [grainsrv],
+            'FRUITSRV': [fruitsrv]
+        })
     
-    # Calculate estimated caloric needs
-    if input_data.gender == Gender.FEMALE:
-        bmr = 447.593 + (9.247 * weight_kg) + (3.098 * input_data.height) - (4.330 * input_data.age)
-    else:
-        bmr = 88.362 + (13.397 * weight_kg) + (4.799 * input_data.height) - (5.677 * input_data.age)
-    
-    # Activity level multiplier
-    activity_multipliers = {
-        ActivityLevel.SEDENTARY: 1.2,
-        ActivityLevel.LIGHTLY_ACTIVE: 1.375,
-        ActivityLevel.MODERATELY_ACTIVE: 1.55,
-        ActivityLevel.VERY_ACTIVE: 1.725,
-        ActivityLevel.SUPER_ACTIVE: 1.9
-    }
-    
-    kcal = bmr * activity_multipliers[input_data.activity_level]
-    
-    # Estimate macronutrients based on dietary preference
-    if input_data.dietary_preference == DietaryPreference.KETO:
-        prot = (kcal * 0.20) / 4
-        carb = (kcal * 0.05) / 4
-        fat = (kcal * 0.75) / 9
-    elif input_data.dietary_preference in [DietaryPreference.VEGETARIAN, DietaryPreference.VEGAN]:
-        prot = (kcal * 0.15) / 4
-        carb = (kcal * 0.60) / 4
-        fat = (kcal * 0.25) / 9
-    else:
-        prot = (kcal * 0.30) / 4
-        carb = (kcal * 0.45) / 4
-        fat = (kcal * 0.25) / 9
-    
-    # Estimate servings
-    vegsrv = 6 if input_data.dietary_preference in [DietaryPreference.VEGETARIAN, DietaryPreference.VEGAN] else 3
-    grainsrv = 6 if 'Gluten' not in input_data.intolerances else 2
-    fruitsrv = 4
-    
-    # Estimate minerals
-    calc = kcal * 0.4
-    phos = kcal * 0.3
-    fe = kcal * 0.006
-    
-    return pd.DataFrame({
-        'KCAL': [kcal],
-        'PROT': [prot],
-        'FAT': [fat],
-        'CARB': [carb],
-        'CALC': [calc],
-        'PHOS': [phos],
-        'FE': [fe],
-        'VEGSRV': [vegsrv],
-        'GRAINSRV': [grainsrv],
-        'FRUITSRV': [fruitsrv]
-    })
+    except Exception as e:
+        logger.error(f"Error preparing input data: {e}")
+        raise HTTPException(status_code=400, detail="Invalid input data")
 
 def get_interpretation(score: float) -> tuple[str, List[str]]:
     """Get interpretation and recommendations based on nutritional score"""
@@ -152,8 +173,8 @@ async def analyze_diet(input_data: DietAnalysisInput):
         )
     
     except Exception as e:
+        logger.error(f"Error during analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
 
 @app.get("/contact")
 async def contact():
@@ -164,7 +185,6 @@ async def contact():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "model_loaded": model is not None}
-
 
 if __name__ == "__main__":
     import uvicorn
