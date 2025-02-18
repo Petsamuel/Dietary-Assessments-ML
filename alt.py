@@ -53,8 +53,28 @@ async def prepare_data(
             csv_text = io.StringIO(contents.decode('utf-8'))
             reader = csv.DictReader(csv_text)
             
-            for row in reader:
+            # Validate CSV headers
+            header = csv_text.readline().strip().split(',')
+            required_columns = ['age', 'height', 'weight', 'gender', 
+                              'activity_level', 'sleep_duration', 
+                              'stress_level', 'smoking_status', 
+                              'alcohol_consumption', 'diabetes', 
+                              'hypertension', 'high_cholesterol', 
+                              'obesity', 'food_allergies', 
+                              'dietary_preference', 
+                              'preferred_protein_sources', 
+                              'intolerances']
+            
+            if not all(col in header for col in required_columns):
+                raise HTTPException(400, "Missing required columns in CSV")
+            
+            # Reset reader to beginning
+            csv_text.seek(0)
+            reader = csv.DictReader(csv_text)
+            
+            for row_idx, row in enumerate(reader, 1):
                 try:
+                    row = {k.strip().lower(): v.strip() for k,v in row.items()}
                     # Convert CSV row to DietAnalysisInput
                     input_data = DietAnalysisInput(
                         age=int(row['age']),

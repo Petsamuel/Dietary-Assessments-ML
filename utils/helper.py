@@ -97,3 +97,34 @@ def prepare_input_data(input_data: DietAnalysisInput) -> pd.DataFrame:
     except Exception as e:
         logger.error(f"Error preparing input data: {e}")
         raise HTTPException(status_code=400, detail="Invalid input data")
+    
+    
+    def get_interpretation(score: float) -> tuple[str, List[str]]:
+        """Get interpretation and recommendations based on nutritional score"""
+        if score > 75:
+            return ("Excellent nutritional balance", [
+                "Maintain current dietary patterns",
+                "Consider adding variety to maintain interest",
+                "Monitor portion sizes to maintain balance"
+            ])
+        elif score > 50:
+            return ("Good nutritional balance", [
+                "Consider increasing protein intake",
+                "Add more variety to vegetable choices",
+                "Monitor processed food intake"
+            ])
+        elif score > 25:
+            return ("Fair nutritional balance", [
+                "Increase fruit and vegetable intake",
+                "Consider reducing processed food consumption",
+                "Add more whole grains to diet",
+                "Consider consulting a nutritionist"
+            ])
+        else:
+            return ("Poor nutritional balance", [
+                "Strongly consider consulting a nutritionist",
+                "Increase protein intake",
+                "Add more fruits and vegetables",
+                "Reduce processed food consumption",
+                "Consider tracking daily food intake"
+            ])
